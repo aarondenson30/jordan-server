@@ -47,17 +47,20 @@ const SUBS = [
   { name: 'builder supply', email: 'fabrizio@buildersupplygroup.com', contact: 'Fabrizio Palermo', company: 'Builder Supply Group' }
 ];
 
+function normalize(str) {
+  return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
 function findSub(subName) {
-  const searchLower = subName.toLowerCase();
-  // Exact company name match first
-  let found = SUBS.find(s => searchLower === s.name);
+  const searchLower = normalize(subName);
+  // Exact match first
+  let found = SUBS.find(s => searchLower === normalize(s.name));
   if (found) return found;
-  // Partial match - require at least 2 words to match for safety
+  // Partial match with normalization
   found = SUBS.find(s => {
-    const words = s.name.split(' ');
-    return words.length >= 2 
-      ? words.every(w => searchLower.includes(w)) || s.name.split(' ').filter(w => searchLower.includes(w)).length >= 2
-      : searchLower.includes(s.name) || s.name.includes(searchLower);
+    const normName = normalize(s.company);
+    const normKey = normalize(s.name);
+    return searchLower.includes(normKey) || normKey.includes(searchLower) || normName.includes(searchLower);
   });
   return found;
 }
