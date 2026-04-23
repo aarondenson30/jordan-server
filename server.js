@@ -1,11 +1,11 @@
 const http = require('http');
 const https = require('https');
 
-const SLACK_TOKEN = 'xoxb-10955866803814-10943096888375-JtV02BnaSMeSv6zSelO5CyzP';
-const MATON_KEY = 'xFwUOzhHTU7PoF8uq92Tt0QF88Kzu85q5sHtPBK7BI5djICOL2mplfbqTKE66mKI-jP1FVNdZF2laAeesIU5BiyEGsP5n1t1pXY';
-const JORDAN_CONN = '2f37bef1-b7f1-4b47-8468-5c0f3ad4155d';
-const OPENAI_KEY = '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';
-const PORT = 3456;
+const SLACK_TOKEN = process.env.SLACK_TOKEN;
+const MATON_KEY = process.env.MATON_KEY;
+const JORDAN_CONN = process.env.JORDAN_CONN;
+const OPENAI_KEY = process.env.OPENAI_KEY;
+const PORT = process.env.PORT || 3456;
 
 const SUBS = [
   { name: 'aloha', email: 'Alohaflooringtx@gmail.com', contact: 'Micah Bacon', company: 'Aloha Premier Tile & Flooring' },
@@ -137,18 +137,15 @@ const server = http.createServer((req, res) => {
     try {
       const data = JSON.parse(body);
 
-      // Slack URL verification
       if (data.type === 'url_verification') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ challenge: data.challenge }));
         return;
       }
 
-      // Respond immediately to Slack (required within 3s)
       res.writeHead(200);
       res.end('ok');
 
-      // Process event async
       const event = data.event || {};
       const text = (event.text || '').trim();
       const channel = event.channel || '';
@@ -169,5 +166,4 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log('Jordan server running on port ' + PORT);
-  console.log('Waiting for Slack events...');
 });
