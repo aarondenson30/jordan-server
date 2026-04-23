@@ -138,37 +138,64 @@ async function sendBidEmail(trade, job, subEmail, subContact, subCompany) {
 }
 
 async function handleMessage(text, channel) {
-  const isBid = text.toLowerCase().includes('bid request');
+  // Use GPT to parse intent from natural language
+  const subList = SUBS.map(s => s.company).join(', ');
+  
+  const parseResult = await post('api.openai.com', '/v1/chat/completions',
+    { Authorization: 'Bearer ' + OPENAI_KEY },
+    {
+      model: 'gpt-4o-mini',
+      messages: [
+        { 
+          role: 'system', 
+          content: `You are Jordan Riviera, Project Manager for Longhorn Contractor Services. Parse incoming Slack messages from field team members.
 
-  if (isBid) {
-    const parts = text.split('|').map(p => p.trim());
-    const trade = parts[1] || 'General';
-    const subName = parts[2] || '';
-    const job = parts[3] || 'Job TBD';
+Known subcontractors: ${subList}
 
-    const found = findSub(subName);
+If the message is asking for a bid request (any variation like "get a bid", "need a bid", "send a bid", "bid request", "get pricing", etc.), extract:
+- trade: the type of work (painting, framing, drywall, roofing, etc.)
+- sub: the subcontractor name (match loosely to known subs list)
+- job: the job address or name
 
+Respond ONLY with JSON in one of these formats:
+
+If it's a bid request:
+{"type":"bid","trade":"Painting","sub":"Master Panda","job":"1202 Marcy"}
+
+If it's NOT a bid request (general question, update, etc.):
+{"type":"chat","reply":"Your 1-2 sentence professional response here"}
+
+If it's a bid request but missing info:
+{"type":"missing","reply":"What's missing - ask for it in 1 sentence"}`
+        },
+        { role: 'user', content: text }
+      ]
+    }
+  );
+
+  let parsed;
+  try {
+    const content = parseResult.choices[0].message.content.trim();
+    parsed = JSON.parse(content);
+  } catch(e) {
+    await slackPost(channel, 'On it.');
+    return;
+  }
+
+  if (parsed.type === 'bid') {
+    const found = findSub(parsed.sub);
     if (!found) {
-      await slackPost(channel, '⚠️ Sub not found: "' + subName + '". Check the name and try again.');
+      await slackPost(channel, '⚠️ I couldn\'t find "' + parsed.sub + '" in the sub database. Check the name and try again.');
       return;
     }
+    await sendBidEmail(parsed.trade, parsed.job, found.email, found.contact, found.company);
+    await slackPost(channel, '✅ Bid sent to ' + found.company + ' for ' + parsed.trade + ' at ' + parsed.job + '. Scope included. Team CC\'d.');
 
-    await sendBidEmail(trade, job, found.email, found.contact, found.company);
-    await slackPost(channel, '✅ Bid sent to ' + found.company + ' for ' + trade + ' at ' + job + '. Scope included. Team CC\'d on Longhorn emails.');
+  } else if (parsed.type === 'missing') {
+    await slackPost(channel, parsed.reply);
 
   } else {
-    const ai = await post('api.openai.com', '/v1/chat/completions',
-      { Authorization: 'Bearer ' + OPENAI_KEY },
-      {
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are Jordan Riviera, Project Manager for Numinous Homes and Longhorn Contractor Services. Professional and brief. 1-2 sentences only.' },
-          { role: 'user', content: text }
-        ]
-      }
-    );
-    const reply = ai.choices && ai.choices[0] ? ai.choices[0].message.content : 'On it.';
-    await slackPost(channel, reply);
+    await slackPost(channel, parsed.reply || 'On it.');
   }
 }
 
