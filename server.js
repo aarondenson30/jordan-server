@@ -160,7 +160,9 @@ If the message is asking for a bid request (any variation like "get a bid", "nee
 Respond ONLY with JSON in one of these formats:
 
 If it's a bid request:
-{"type":"bid","trade":"Painting","sub":"Master Panda","job":"1202 Marcy"}
+{"type":"bid","trade":"Painting","sub":"Master Panda","job":"1202 Marcy","email":"optional@email.com"}
+
+If an email address is mentioned in the message, include it in the email field. If not, omit it.
 
 If it's NOT a bid request (general question, update, etc.):
 {"type":"chat","reply":"Your 1-2 sentence professional response here"}
@@ -184,12 +186,18 @@ If it's a bid request but missing info:
 
   if (parsed.type === 'bid') {
     const found = findSub(parsed.sub);
-    if (!found) {
-      await slackPost(channel, '⚠️ I couldn\'t find "' + parsed.sub + '" in the sub database. Check the name and try again.');
+    
+    // Use found sub OR use email provided directly in the message
+    const subEmail = parsed.email || (found ? found.email : null);
+    const subContact = found ? found.contact : parsed.sub;
+    const subCompany = found ? found.company : parsed.sub;
+
+    if (!subEmail) {
+      await slackPost(channel, '⚠️ I don\'t have ' + parsed.sub + ' in the database. Reply with their email address and I\'ll send the bid right out.');
       return;
     }
-    await sendBidEmail(parsed.trade, parsed.job, found.email, found.contact, found.company);
-    await slackPost(channel, '✅ Bid sent to ' + found.company + ' for ' + parsed.trade + ' at ' + parsed.job + '. Scope included. Team CC\'d.');
+    await sendBidEmail(parsed.trade, parsed.job, subEmail, subContact, subCompany);
+    await slackPost(channel, '✅ Bid sent to ' + subCompany + ' for ' + parsed.trade + ' at ' + parsed.job + '. Scope included. Team CC\'d.');
 
   } else if (parsed.type === 'missing') {
     await slackPost(channel, parsed.reply);
