@@ -1,11 +1,34 @@
 const http = require('http');
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
 const SLACK_TOKEN = process.env.SLACK_TOKEN;
 const MATON_KEY = process.env.MATON_KEY;
 const JORDAN_CONN = process.env.JORDAN_CONN;
 const OPENAI_KEY = process.env.OPENAI_KEY;
 const PORT = process.env.PORT || 3456;
+
+// Load scopes
+let SCOPES = {};
+try {
+  SCOPES = JSON.parse(fs.readFileSync(path.join(__dirname, 'scopes.json'), 'utf8'));
+} catch(e) {
+  console.log('No scopes.json found');
+}
+
+function getScope(trade) {
+  const tradeLower = trade.toLowerCase();
+  // Try exact match first
+  for (const [key, val] of Object.entries(SCOPES)) {
+    if (tradeLower === key) return val;
+  }
+  // Try partial match
+  for (const [key, val] of Object.entries(SCOPES)) {
+    if (tradeLower.includes(key) || key.includes(tradeLower)) return val;
+  }
+  return null;
+}
 
 const SUBS = [
   { name: 'aloha', email: 'Alohaflooringtx@gmail.com', contact: 'Micah Bacon', company: 'Aloha Premier Tile & Flooring' },
@@ -23,6 +46,21 @@ const SUBS = [
   { name: 'oag', email: 'mrios@service-partners.com', contact: '', company: 'OAG Loyalty Insulation' },
   { name: 'builder supply', email: 'fabrizio@buildersupplygroup.com', contact: 'Fabrizio Palermo', company: 'Builder Supply Group' }
 ];
+
+function findSub(subName) {
+  const searchLower = subName.toLowerCase();
+  // Exact company name match first
+  let found = SUBS.find(s => searchLower === s.name);
+  if (found) return found;
+  // Partial match - require at least 2 words to match for safety
+  found = SUBS.find(s => {
+    const words = s.name.split(' ');
+    return words.length >= 2 
+      ? words.every(w => searchLower.includes(w)) || s.name.split(' ').filter(w => searchLower.includes(w)).length >= 2
+      : searchLower.includes(s.name) || s.name.includes(searchLower);
+  });
+  return found;
+}
 
 function post(hostname, path, headers, body) {
   return new Promise((resolve, reject) => {
@@ -51,6 +89,12 @@ function slackPost(channel, text) {
 
 async function sendBidEmail(trade, job, subEmail, subContact, subCompany) {
   console.log('Sending bid email to', subEmail, 'for', trade, 'at', job);
+  
+  const scope = getScope(trade);
+  const scopeSection = scope 
+    ? '\n\nSCOPE OF WORK:\n' + scope
+    : '';
+
   return post('gateway.maton.ai', '/outlook/v1.0/me/sendMail',
     { Authorization: 'Bearer ' + MATON_KEY, 'Maton-Connection': JORDAN_CONN },
     {
@@ -65,22 +109,24 @@ async function sendBidEmail(trade, job, subEmail, subContact, subCompany) {
             '',
             'Trade: ' + trade,
             'Job Address: ' + job,
+            scopeSection,
             '',
             'Please provide your bid at your earliest convenience.',
             '',
             'Thank you,',
             'Jordan Riviera',
             'Project Manager | Longhorn Contractor Services',
-            'jordan@longhorncsteam.com'
+            'jordan@longhorncsteam.com',
+            '(512) 555-0100'
           ].join('\n')
         },
         toRecipients: [{ emailAddress: { address: subEmail } }],
         ccRecipients: [
-          { emailAddress: { address: 'aaron@numinousteam.com' } },
-          { emailAddress: { address: 'bobby@numinousteam.com' } },
-          { emailAddress: { address: 'brittney@numinousteam.com' } },
-          { emailAddress: { address: 'said@numinousteam.com' } },
-          { emailAddress: { address: 'leslie@numinousteam.com' } }
+          { emailAddress: { address: 'aaron@longhorncsteam.com' } },
+          { emailAddress: { address: 'bobby@longhorncsteam.com' } },
+          { emailAddress: { address: 'brittney@longhorncsteam.com' } },
+          { emailAddress: { address: 'said@longhorncsteam.com' } },
+          { emailAddress: { address: 'leslie@longhorncsteam.com' } }
         ]
       },
       saveToSentItems: true
@@ -97,8 +143,7 @@ async function handleMessage(text, channel) {
     const subName = parts[2] || '';
     const job = parts[3] || 'Job TBD';
 
-    const searchLower = subName.toLowerCase();
-    const found = SUBS.find(s => searchLower.includes(s.name) || s.name.includes(searchLower));
+    const found = findSub(subName);
 
     if (!found) {
       await slackPost(channel, '⚠️ Sub not found: "' + subName + '". Check the name and try again.');
@@ -106,7 +151,7 @@ async function handleMessage(text, channel) {
     }
 
     await sendBidEmail(trade, job, found.email, found.contact, found.company);
-    await slackPost(channel, '✅ Bid sent to ' + found.company + ' for ' + trade + ' at ' + job + '. Aaron, Bobby, Brittney, Said & Leslie CC\'d.');
+    await slackPost(channel, '✅ Bid sent to ' + found.company + ' for ' + trade + ' at ' + job + '. Scope included. Team CC\'d on Longhorn emails.');
 
   } else {
     const ai = await post('api.openai.com', '/v1/chat/completions',
