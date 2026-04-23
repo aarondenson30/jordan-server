@@ -1,0 +1,12 @@
+{
+  "name": "jordan-server",
+  "version": "1.0.0",
+  "description": "Jordan Riviera bid request server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
