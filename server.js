@@ -44,7 +44,8 @@ const SUBS = [
   { name: 'david valle', email: 'davidvalleconcrete@gmail.com', contact: 'David Valle', company: 'David Valle Concrete' },
   { name: 'ff construction', email: 'f.fconstructionllc1@gmail.com', contact: 'Juan Flores', company: 'FF Construction' },
   { name: 'oag', email: 'mrios@service-partners.com', contact: '', company: 'OAG Loyalty Insulation' },
-  { name: 'builder supply', email: 'fabrizio@buildersupplygroup.com', contact: 'Fabrizio Palermo', company: 'Builder Supply Group' }
+  { name: 'builder supply', email: 'fabrizio@buildersupplygroup.com', contact: 'Fabrizio Palermo', company: 'Builder Supply Group' },
+  { name: 'calderon', email: 'calderon.contractors@gmail.com', contact: 'Agustin Calderon', company: 'Calderon Contractors' }
 ];
 
 function normalize(str) {
@@ -167,8 +168,11 @@ If an email address is mentioned in the message, include it in the email field. 
 If it's NOT a bid request (general question, update, etc.):
 {"type":"chat","reply":"Your 1-2 sentence professional response here"}
 
-If it's a bid request but missing info:
-{"type":"missing","reply":"What's missing - ask for it in 1 sentence"}`
+If it's a bid request but the sub is not in the known list, still return type:"bid" with whatever sub name was given. Do NOT ask clarifying questions about the sub name.
+If truly missing critical info (no trade OR no job address), return:
+{"type":"missing","reply":"One specific question to get the missing info"}
+
+IMPORTANT: Never ask who the sub is or what their email is - the system handles that. Only ask if trade or job address is completely missing.`
         },
         { role: 'user', content: text }
       ]
@@ -250,3 +254,4 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log('Jordan server running on port ' + PORT);
 });
+
