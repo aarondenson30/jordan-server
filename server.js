@@ -30,6 +30,38 @@ function getScope(trade) {
   return null;
 }
 
+// PROJECT ALIASES - Jordan knows these shorthand names
+const PROJECTS = {
+  'marcy': '1202 & 1204 Marcy, Austin TX',
+  '1202': '1202 Marcy, Austin TX',
+  '1204': '1204 Marcy, Austin TX',
+  'frederick': '136 Frederick St, Austin TX 78704',
+  'fred': '136 Frederick St, Austin TX 78704',
+  'longview': '2037 Longview, Austin TX',
+  'twilight': '8316 Twilight Terrace, Austin TX 78737',
+  'ruth': '1402 Ruth Ave, Austin TX 78757',
+  'springdale': '1610 Springdale, Austin TX',
+  'harvey': '1610 Harvey St, Austin TX',
+  'hank': '4308 Hank Ave, Austin TX 78745',
+  'indian hawthorne': '936 Indian Hawthorne, Georgetown TX',
+  'indian': '936 Indian Hawthorne, Georgetown TX',
+  'hawthorne': '936 Indian Hawthorne, Georgetown TX',
+  'krebs': '409 Krebs, Austin TX',
+  'webberville': '1301 Webberville, Austin TX',
+  'piedmont': 'Piedmont, Austin TX',
+  'saint johns': 'Saint Johns, Austin TX',
+  'sj': 'Saint Johns, Austin TX',
+};
+
+function resolveJob(jobInput) {
+  if (!jobInput) return jobInput;
+  const lower = jobInput.toLowerCase().trim();
+  for (const [alias, full] of Object.entries(PROJECTS)) {
+    if (lower.includes(alias)) return full;
+  }
+  return jobInput; // return as-is if no match
+}
+
 const SUBS = [
   { name: 'aloha', email: 'Alohaflooringtx@gmail.com', contact: 'Micah Bacon', company: 'Aloha Premier Tile & Flooring' },
   { name: 'abella', email: 'abellasweldingtx@gmail.com', contact: 'Fernando Abella', company: "Abella's Welding" },
@@ -190,11 +222,13 @@ IMPORTANT: Never ask who the sub is or what their email is - the system handles 
 
   if (parsed.type === 'bid') {
     const found = findSub(parsed.sub);
+    const resolvedJob = resolveJob(parsed.job);
     
     // Use found sub OR use email provided directly in the message
     const subEmail = parsed.email || (found ? found.email : null);
     const subContact = found ? found.contact : parsed.sub;
     const subCompany = found ? found.company : parsed.sub;
+    parsed.job = resolvedJob;
 
     if (!subEmail) {
       await slackPost(channel, '⚠️ I don\'t have ' + parsed.sub + ' in the database. Reply with their email address and I\'ll send the bid right out and add them to the sub database.');
