@@ -197,8 +197,21 @@ IMPORTANT: Never ask who the sub is or what their email is - the system handles 
     const subCompany = found ? found.company : parsed.sub;
 
     if (!subEmail) {
-      await slackPost(channel, '⚠️ I don\'t have ' + parsed.sub + ' in the database. Reply with their email address and I\'ll send the bid right out.');
+      await slackPost(channel, '⚠️ I don\'t have ' + parsed.sub + ' in the database. Reply with their email address and I\'ll send the bid right out and add them to the sub database.');
       return;
+    }
+
+    // Auto-add to database if not already there
+    if (!found && subEmail) {
+      SUBS.push({ name: parsed.sub.toLowerCase(), email: subEmail, contact: parsed.sub, company: parsed.sub });
+      console.log('Added new sub to database:', parsed.sub, subEmail);
+      // Save to scopes.json subs section if possible
+      try {
+        const dbPath = path.join(__dirname, 'subs-database.json');
+        const db = fs.existsSync(dbPath) ? JSON.parse(fs.readFileSync(dbPath, 'utf8')) : [];
+        db.push({ name: parsed.sub.toLowerCase(), email: subEmail, contact: parsed.sub, company: parsed.sub, addedDate: new Date().toISOString() });
+        fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+      } catch(e) { console.log('Could not save to db file:', e.message); }
     }
     await sendBidEmail(parsed.trade, parsed.job, subEmail, subContact, subCompany);
     await slackPost(channel, '✅ Bid sent to ' + subCompany + ' for ' + parsed.trade + ' at ' + parsed.job + '. Scope included. Team CC\'d.');
